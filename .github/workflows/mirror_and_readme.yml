@@ -26,8 +26,8 @@ jobs:
       - name: Mirror Gitcode to GitHub
         uses: Yikun/hub-mirror-action@master
         with:
-          src: gitcode
-          dst: github
+          src: gitcode/${{ matrix.src_user }}
+          dst: github/oh-awesome
           dst_key: ${{ secrets.SSH_PRIVATE_KEY }}
           dst_token: ${{ secrets.GITHUB_TOKEN }}
           src_token: ${{ secrets.GITCODE_TOKEN }}
