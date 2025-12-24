@@ -9,7 +9,7 @@ GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") # Use the token provided in workfl
 LLM_API_KEY = os.environ.get("LLM_API_KEY")
 LLM_API_BASE = os.environ.get("LLM_API_BASE", "https://api.z.ai/api/paas/v4/")
 LLM_MODEL = os.environ.get("LLM_MODEL", "glm-4.5-flash")
-README_FILE = "README.md"
+README_FILE = "profile/README.md"
 DATA_FILE = "repo_data.json"
 
 def fetch_github_repos(username):
@@ -43,7 +43,29 @@ def fetch_github_repos(username):
             
     return repos
 
-def get_llm_description(repo_name, current_description):
+def get_readme_content(username, repo_name):
+    """Fetch the README content for a repository."""
+    url = f"https://api.github.com/repos/{username}/{repo_name}/readme"
+    headers = {
+        "Accept": "application/vnd.github.v3+json"
+    }
+    if GITHUB_TOKEN:
+        headers["Authorization"] = f"token {GITHUB_TOKEN}"
+
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            if "content" in data:
+                import base64
+                content = base64.b64decode(data["content"]).decode("utf-8", errors="ignore")
+                return content[:2000] # Truncate to avoid token limits
+    except Exception as e:
+        print(f"Error fetching README for {repo_name}: {e}")
+    
+    return ""
+
+def get_llm_description(repo_name, current_description, readme_content=""):
     """Generate a classification and description using LLM."""
     if not LLM_API_KEY:
         print("Skipping LLM: No API Key")
@@ -53,6 +75,8 @@ def get_llm_description(repo_name, current_description):
     Analyze the following repository:
     Name: {repo_name}
     Description: {current_description}
+    README Content (excerpt):
+    {readme_content}
 
     Provide a JSON response with two keys:
     1. "category": A short category name (e.g., "AI", "Tools", "Web", "System", "Learning", "Mobile").
@@ -74,21 +98,25 @@ def get_llm_description(repo_name, current_description):
     try:
         # Retry logic
         for _ in range(3):
-            response = requests.post(f"{LLM_API_BASE}/chat/completions", headers=headers, json=data)
-            if response.status_code == 200:
-                result = response.json()
-                content = result["choices"][0]["message"]["content"]
-                # Clean up potential markdown formatting
-                if "```json" in content:
-                    content = content.split("```json")[1].split("```")[0].strip()
-                elif "```" in content:
-                    content = content.split("```")[1].split("```")[0].strip()
-                
-                return json.loads(content)
-            else:
-                print(f"LLM Error: {response.status_code}")
-                time.sleep(2)
-                
+            try:
+                response = requests.post(f"{LLM_API_BASE}/chat/completions", headers=headers, json=data, timeout=30)
+                if response.status_code == 200:
+                    result = response.json()
+                    content = result["choices"][0]["message"]["content"]
+                    # Clean up potential markdown formatting
+                    if "```json" in content:
+                        content = content.split("```json")[1].split("```")[0].strip()
+                    elif "```" in content:
+                        content = content.split("```")[1].split("```")[0].strip()
+                    
+                    return json.loads(content)
+                else:
+                    print(f"LLM Error: {response.status_code}")
+                    time.sleep(2)
+            except requests.exceptions.Timeout:
+                 print("LLM Request timed out")
+                 time.sleep(2)
+                 
     except Exception as e:
         print(f"LLM Call failed: {e}")
     
@@ -136,7 +164,8 @@ def main():
         else:
             # New or updated
             print(f"Analyzing new/updated repo: {name}")
-            llm_data = get_llm_description(name, desc)
+            readme = get_readme_content(GITHUB_USERNAME, name)
+            llm_data = get_llm_description(name, desc, readme)
             cache[name] = {
                 "description": desc,
                 "llm_data": llm_data,
@@ -178,6 +207,7 @@ def main():
             content += f"| [{item['name']}]({item['url']}) | {desc_text} |\n"
         content += "\n"
 
+    os.makedirs(os.path.dirname(README_FILE), exist_ok=True)
     with open(README_FILE, "w") as f:
         f.write(content)
     print("README.md updated successfully.")
