@@ -19,9 +19,15 @@ jobs:
             account_type: "org"
             static_list: "DevBox"
 
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+
+      - name: Configure Git LFS
+        run: git config --global lfs.allowincompletepush true
 
       - name: Mirror Gitcode to GitHub
         uses: Yikun/hub-mirror-action@master
