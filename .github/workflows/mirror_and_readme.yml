@@ -26,11 +26,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Configure Git LFS
-        run: git config --global lfs.allowincompletepush true
-
       - name: Mirror Gitcode to GitHub
         uses: Yikun/hub-mirror-action@master
+        env:
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: "lfs.allowincompletepush"
+          GIT_CONFIG_VALUE_0: "true"
         with:
           src: gitcode/${{ matrix.src_user }}
           dst: github/oh-awesome
