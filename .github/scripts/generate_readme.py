@@ -9,7 +9,6 @@ GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") # Use the token provided in workfl
 LLM_API_KEY = os.environ.get("LLM_API_KEY")
 LLM_API_BASE = os.environ.get("LLM_API_BASE", "https://api.z.ai/api/paas/v4/")
 LLM_MODEL = os.environ.get("LLM_MODEL", "glm-4.5-flash")
-README_FILE = "profile/README.md"
 DATA_FILE = "repo_data.json"
 
 def fetch_github_repos(username):
@@ -207,10 +206,14 @@ def main():
             content += f"| [{item['name']}]({item['url']}) | {desc_text} |\n"
         content += "\n"
 
-    os.makedirs(os.path.dirname(README_FILE), exist_ok=True)
-    with open(README_FILE, "w") as f:
-        f.write(content)
-    print("README.md updated successfully.")
+    # Write to multiple locations
+    files_to_update = ["README.md", "profile/README.md"]
+    
+    for file_path in files_to_update:
+        os.makedirs(os.path.dirname(file_path) or ".", exist_ok=True)
+        with open(file_path, "w") as f:
+            f.write(content)
+        print(f"{file_path} updated successfully.")
 
 if __name__ == "__main__":
     main()
